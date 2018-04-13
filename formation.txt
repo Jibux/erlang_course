@@ -1,0 +1,256 @@
+notes cours Erlang:
+
+OTP libriaire :
+	Behavior
+		Pattern description for processes with the same structure
+2 types principaux
+		supervisor
+			démarrer
+				supervisor:start_link({local,PROCESS_NAME},?MODULE,Args).
+			Callback:
+				init/1 doit renvoyer OK+child descritpion
+			specification des enfants:
+				Child_desc={Id, StartFunc,Restart,Shutdown,Type,Modules}
+					Id=toto
+					startFunc={toto,start,[variables...]}
+					Restart= startegie de redémarage
+							- permanent => redémare toujours
+							- temporary => redémare jamais
+							- transient => redémare en cas d'erreur
+					Shutdown= si on arrete le noeud comment ca se passe ?
+							- brutalkill
+							- timeout (definir valeur numérique en secondes)
+					Type: 
+							-Supervisor
+							-worker
+					Module= nom du module ou "dynamic" (type defini dans OTP)
+				
+					
+				Child_spec={{strategie,maxTime,MaxRetry},Child_desc}
+				
+		Gen_server
+			server au sens client/server
+			continue a vivre une fois lancé.
+			a un état: 
+			démarer:
+				gen_server:start_link({local,Name},Module,[arguments...],[Options])
+			callback: 
+				init/1 doit renvoyer OK + l'etat
+				handle_call/3  (params,_From, state)
+					_From : pid du process faisant le call
+				handle_cast/3  (Params, from,State)
+					envoi d'un message a un server  sans attendre de réponse : Asynchrone
+				handle_info/2 (Params, State)
+					permet de recevoir un message envoyé avec : Pid!Message 
+				Terminate/3
+Epmd c'est le démon en charge de la com entre chaques nodes 
+
+rappel:
+	tupple=  {...,...,...}
+    liste=   [...,...,...]
+	self() renvoi le pid du process courant
+	_ : wild card
+	truc qui commence par _ : variable definie mais qui ne provoquera pas de warning si elle est pas utilisée
+	callback, fonction a definir obligatoire pour que le system puisse utiliser le bahavior
+
+Listes
+======
+Composée de tete et queue
+1 elem => H = elem et Q = []
+X elem => H = 1er elem et Q = [list - elem]
+
+Liste A:
+hd(A) => recup tête
+Patern matching:
+[H|T] = A.
+H = 1er elem
+T = queue
+
+A = [1,2].
+[4 | A].
+=> [4,1,2]
+A ++ 4.
+=> [1,2,4]
+
+
+Tuple
+=====
+{a,b,c,d}
+* Immutable = nb elem fixe
+
+BIF
+===
+Fonctions hard codées en C, non modifiable.
+
+Record
+======
+Definition: -record(person, {name, age}).
+Definition: -record(person, {name=val par défaut, age}).
+Creation: #person{name=Name, age=Age}.
+Representation: {person,ernie,44}
+#person.name → position in the tuple: 1
+Person#person.name to access to a field value
+immutable
+Not a true data type -> Record expressions are translated to tuple expressions during compilation. 
+record_info(fields, Record) -> [Field]
+record_info(size, Record) -> Size
+
+Patern matching
+===============
+On peut patern matcher dans les param d'une fonction.
+
+Variable
+========
+Visible dans le scope (function).
+Interne au scope.
+Naming:
+Variable: normal var
+_Variable: pas de warning si on n'utilise pas la variable. Mais warning si on l'utilise.
+
+
+CONDITIONAL
+===========
+if
+   p > 3 ->
+       p + 6;
+   p < 0 ->
+       0;
+   true ->
+       1
+end
+
+
+case Var of
+   {...} ->
+      true;
+   {...} ->
+      false;
+   _ ->
+      false
+end
+
+if et case sont chacun des scopes.
+
+
+MESSAGING
+=========
+Communiquer entre process:
+- send:
+Pid ! mon_message
+Pid ! {self(), mon_atom}
+- Receive
+receive
+after ExprR ->
+    ...
+end
+
+Ex.
+
+Client:
+-------
+Pid ! {self(), mon_atom}
+...
+...
+receive
+   bien_recu ->
+      ok;
+   pas_bien_recu ->
+      ko
+after 1000 ->
+      ko
+end
+
+
+Server:
+-------
+receive
+   {Pid_parent,Atom} ->
+       Pid_parent ! bien_recu
+end
+
+
+spawn_link
+-> spawn mais lié au fils
+si le fils meurt, le père aussi sauf si il gère l'exit
+si le père meurt, tous les fils meurent
+
+
+Dict:
+=====
+Map=dict:new()
+Map1=dict:put(Map,toto,"tata")
+get(Map1,toto)
+
+Distribution:
+=============
+Cluster of erlang VM. Used to communicate between erlang VM. Use TCP/IP.
+Erlang VM = a node.
+
+OTP - librairie erlang
+======================
+OTP Behaviour: design patern
+* Supervisor
+* Gen-Server
+
+* Supervisor
+- supervise de worker (Gen-Server, process, supervisor)
+- Démarre les worker
+- les monitorise
+- redémarre (ou pas) les w quand ils crashent
+
+
+Startégie pour démarrer les fils du supervisor:
+startFunc: {toto, start, []}
+Restart:
+	- permanent -> toujours restart
+	- temporary -> jamais
+	- transient -> si error on restart
+Shutdown:
+	- brutalkill
+	- timeout (nombre)
+Type:
+	- supervisor
+	- worker
+Module:
+	- [toto]
+	- dynamic
+
+* Gen_Server
+Init(Arg)
+	Arg = {ok, State}
+	State = whatever
+
+Appel synchrone:
+Res = gen_server_call(Server, Request, Timeout)
+=> appelle 
+	handle_call({...},From,State) ->
+	...
+
+Appel assynchrone
+handle_cast(Params,_From,State) ->
+...
+{noreply,State}
+
+gen_server:cast(Myriad,toto)
+=> répond directe "ok"
+
+2ème appel assynchrone
+handle_info(Params,State) -> (plus de From)
+...
+{noreply,State}
+{noreply,State,5000(timeout)}
+{noreply,State,hibernate} => reduit la mémoire utilisée par le gen_server et le réveille quand on reçoit un message
+=> parfois des messages du système erlang
+=> Appelé avec !
+
+Termination of Gen_Server
+- init ->
+	{ok,State}
+	{stop,"ca va pas",State} => appelle terminate
+- handle_call ->
+	{stop,Reason,Reply,NewLoopData} => appelle terminate
+- handle_cast ->
+	{stop,Reason,NewLoopData} => appelle terminate
+- terminate(Reason,State) ->
+...
+

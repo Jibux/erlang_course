@@ -1,0 +1,32 @@
+1> supervisor:start_link({local, my_sup}, my_super_sup, []).
+{ok,<0.35.0>}
+6> whereis(my_sup).
+<0.35.0>
+7> whereis(mon_gege). 
+<0.36.0>
+8> gen_server:call(mon_gege, {polo,test}, 5000).
+"J'aime les frites"
+9> gen_server:cast(mon_gege, {polo,test}).      
+ok
+10> whereis(mon_gege)!test                 
+10> .
+test
+11> whereis(mon_gege)!polo.
+polo
+
+supervisor:start_link({local, my_sup}, my_super_sup, []).
+whereis(mon_gege).
+gen_server:cast(mon_gege, {push,{"test"}}).
+gen_server:cast(mon_gege, {push,{"test2"}}).
+gen_server:cast(mon_gege, {push,{"test3","test4"}}).
+gen_server:cast(mon_gege, {push,"test5"}).          
+gen_server:call(mon_gege, pop, 5000).    
+
+
+application:ensure_all_started(my_application_app).
+Pid = whereis(mon_sup).
+
+4> supervisor:which_children(Pid).
+[{gege,<0.39.0>,worker,[my_genserv]}]
+
+
